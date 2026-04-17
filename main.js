@@ -14,16 +14,22 @@ function createWindow() {
     backgroundColor: '#0f0f0f',
     webPreferences: {
       nodeIntegration: true,
-      contextIsolation: false,
+      contextIsolation: false, // Required for our direct IPC/FS usage
     }
   });
 
   mainWindow.loadFile('index.html');
 }
 
+// --- APP DATA PATH LISTENER ---
+// Essential for production so Saved Hosts go to AppData instead of the install folder
+ipcMain.on('get-user-data-path', (event) => {
+  event.returnValue = app.getPath('userData');
+});
+
 // --- SSH & SFTP CORE LOGIC ---
 ipcMain.on('ssh-connect', (event, { host, username, password }) => {
-  // Reset connection if one exists
+  // Clear any existing connection attempt
   conn = new Client();
 
   conn.on('ready', () => {
@@ -84,21 +90,18 @@ ipcMain.on('sftp-ls', (event, remotePath) => {
   listRemoteDir(event, remotePath);
 });
 
-// --- THE DOWNLOADER ---
+// --- THE DOWNLOADER (Server -> PC) ---
 ipcMain.on('sftp-download', (event, { remotePath, filename }) => {
   if (!sftpSession) return;
 
-  // 1. Open Native Windows Save Dialog
   dialog.showSaveDialog(mainWindow, {
     title: `Download ${filename}`,
     defaultPath: path.join(app.getPath('downloads'), filename)
   }).then(result => {
     if (!result.canceled && result.filePath) {
       const localPath = result.filePath;
-      
       event.reply('ssh-status', `Downloading ${filename}...`);
 
-      // 2. FastGet: High-speed SFTP transfer
       sftpSession.fastGet(remotePath, localPath, {}, (err) => {
         if (err) {
           event.reply('ssh-error', `Download Failed: ${err.message}`);
@@ -107,9 +110,34 @@ ipcMain.on('sftp-download', (event, { remotePath, filename }) => {
         }
       });
     }
-  }).catch(err => {
-    console.error("Dialog Error:", err);
-  });
+  }).catch(err => console.error("Dialog Error:", err));
+});
+
+// --- THE UPLOADER (PC -> Server) ---
+ipcMain.on('sftp-upload', (event, { remoteDir }) => {
+  if (!sftpSession) return;
+
+  dialog.showOpenDialog(mainWindow, {
+    properties: ['openFile'],
+    title: 'Select File to Upload'
+  }).then(result => {
+    if (!result.canceled && result.filePaths.length > 0) {
+      const localPath = result.filePaths[0];
+      const filename = path.basename(localPath);
+      const remotePath = `${remoteDir}/${filename}`;
+
+      event.reply('ssh-status', `Uploading ${filename}...`);
+
+      sftpSession.fastPut(localPath, remotePath, {}, (err) => {
+        if (err) {
+          event.reply('ssh-error', `Upload Failed: ${err.message}`);
+        } else {
+          event.reply('ssh-status', `Uploaded ${filename} successfully!`);
+          listRemoteDir(event, remoteDir); // Refresh list
+        }
+      });
+    }
+  }).catch(err => console.error("Upload Dialog Error:", err));
 });
 
 // App Lifecycle

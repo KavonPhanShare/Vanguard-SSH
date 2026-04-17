@@ -5,7 +5,7 @@
   <title>Vanguard SSH - Pro Edition</title>
   <link rel="stylesheet" href="node_modules/@xterm/xterm/css/xterm.css" />
   <style>
-    /* Layout & Global */
+    /* Global Styles */
     body { background: #0f0f0f; color: #eee; font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; display: flex; height: 100vh; overflow: hidden; }
     
     /* Sidebar */
@@ -13,7 +13,7 @@
     .sidebar-header { padding: 25px 20px; font-weight: bold; color: #4e4eff; border-bottom: 1px solid #222; font-size: 1.2rem; letter-spacing: 1px; }
     
     .tab-buttons { display: flex; padding: 10px; gap: 5px; border-bottom: 1px solid #333; background: #121212; }
-    .tab-btn { flex: 1; background: #2a2a2a; color: #aaa; border: 1px solid #444; padding: 6px; cursor: pointer; border-radius: 4px; font-size: 10px; font-weight: bold; text-transform: uppercase; transition: 0.2s; }
+    .tab-btn { flex: 1; background: #2a2a2a; color: #aaa; border: 1px solid #444; padding: 8px; cursor: pointer; border-radius: 4px; font-size: 10px; font-weight: bold; text-transform: uppercase; transition: 0.2s; }
     .tab-btn:hover { background: #333; color: white; }
     .tab-btn.active { background: #4e4eff; color: white; border-color: #4e4eff; }
     
@@ -25,20 +25,17 @@
     .folder { color: #ffca28; font-weight: bold; }
     .dl-btn { background: #2e7d32; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 10px; font-weight: bold; visibility: hidden; }
     .file-item:hover .dl-btn { visibility: visible; }
-    .dl-btn:hover { background: #388e3c; }
 
-    /* Main Area */
+    /* Main Content */
     .main-content { flex: 1; display: flex; flex-direction: column; padding: 20px; background: #0c0c0c; }
-    .controls { display: flex; gap: 10px; margin-bottom: 20px; background: #181818; padding: 15px; border-radius: 10px; border: 1px solid #333; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+    .controls { display: flex; gap: 10px; margin-bottom: 20px; background: #181818; padding: 15px; border-radius: 10px; border: 1px solid #333; }
     
-    input { background: #252525; border: 1px solid #444; color: white; padding: 10px; border-radius: 6px; flex: 1; font-size: 0.9rem; outline: none; transition: 0.3s; }
-    input:focus { border-color: #4e4eff; box-shadow: 0 0 5px rgba(78, 78, 255, 0.3); }
+    input { background: #252525; border: 1px solid #444; color: white; padding: 10px; border-radius: 6px; flex: 1; font-size: 0.9rem; outline: none; }
+    input:focus { border-color: #4e4eff; }
     
     button#connectBtn { background: #4e4eff; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; }
     button#saveBtn { background: #333; color: #ccc; border: 1px solid #555; padding: 10px 15px; border-radius: 6px; cursor: pointer; }
-    button#saveBtn:hover { background: #444; color: white; }
 
-    /* Terminal */
     #terminal-container { flex: 1; background: #000; border-radius: 10px; border: 1px solid #333; overflow: hidden; padding: 10px; }
   </style>
 </head>
@@ -48,26 +45,25 @@
     <div class="sidebar-header">VANGUARD</div>
     
     <div class="tab-buttons">
-      <button id="hostsTab" class="tab-btn active" onclick="showTab('hosts')">Saved Hosts</button>
-      <button id="filesTab" class="tab-btn" onclick="showTab('files')">File Explorer</button>
+      <button id="hostsTab" class="tab-btn active" onclick="showTab('hosts')">Hosts</button>
+      <button id="filesTab" class="tab-btn" onclick="showTab('files')">Files</button>
     </div>
     
-    <div id="serverList" class="server-list">
-      <div style="color:#666; font-size: 0.8rem; text-align: center; margin-top: 20px;">No saved servers yet.</div>
-    </div>
+    <div id="serverList" class="server-list"></div>
     
     <div id="fileExplorer" class="file-list" style="display:none;">
-      <div id="currentPath" style="font-size: 11px; color: #4e4eff; margin-bottom: 15px; word-break: break-all; font-family: monospace;">/</div>
-      <div id="filesContainer" style="color:#666; font-size: 0.8rem;">Connect to a server to browse files.</div>
+      <button id="uploadBtn" style="width:100%; margin-bottom:10px; background:#2e7d32; color:white; border:none; padding:8px; border-radius:4px; cursor:pointer; font-size:11px;">⬆️ UPLOAD FILE</button>
+      <div id="currentPath" style="font-size: 11px; color: #4e4eff; margin-bottom: 15px; font-family: monospace; word-break: break-all;">/</div>
+      <div id="filesContainer">Connect to browse...</div>
     </div>
   </div>
 
   <div class="main-content">
     <div class="controls">
-      <input id="serverName" placeholder="Nickname (e.g. Prod VPS)" style="flex: 0.6;" />
-      <input id="host" placeholder="IP Address / Host" />
-      <input id="user" placeholder="Username" />
-      <input id="pass" type="password" placeholder="Password" />
+      <input id="serverName" placeholder="Nickname" style="flex: 0.5;" />
+      <input id="host" placeholder="IP Address" />
+      <input id="user" placeholder="User" />
+      <input id="pass" type="password" placeholder="Pass" />
       <button id="connectBtn">Connect</button>
       <button id="saveBtn">Save</button>
     </div>
@@ -81,13 +77,15 @@
     const fs = require('fs');
     const path = require('path');
 
-    const configPath = path.join(__dirname, 'servers.json');
+    // --- PRODUCTION PATH LOGIC ---
+    // This asks the Main process for the correct AppData path
+    const userDataPath = ipcRenderer.sendSync('get-user-data-path');
+    const configPath = path.join(userDataPath, 'servers.json');
 
-    // 1. Initialize Xterm.js
+    // 1. Terminal Init
     const term = new Terminal({
       cursorBlink: true,
-      theme: { background: '#000000', foreground: '#ffffff', cursor: '#4e4eff' },
-      fontFamily: '"Fira Code", Consolas, monospace',
+      theme: { background: '#000000', foreground: '#ffffff' },
       fontSize: 14
     });
     const fitAddon = new FitAddon();
@@ -96,30 +94,26 @@
     fitAddon.fit();
     window.onresize = () => fitAddon.fit();
 
-    // 2. Tab Management
+    // 2. Tabs
     function showTab(tab) {
       document.getElementById('serverList').style.display = tab === 'hosts' ? 'block' : 'none';
       document.getElementById('fileExplorer').style.display = tab === 'files' ? 'block' : 'none';
-      
       document.getElementById('hostsTab').classList.toggle('active', tab === 'hosts');
       document.getElementById('filesTab').classList.toggle('active', tab === 'files');
     }
 
-    // 3. Saved Servers (Host Management)
+    // 3. Server Management
     function loadServers() {
+      if (!fs.existsSync(userDataPath)) fs.mkdirSync(userDataPath, { recursive: true });
       if (!fs.existsSync(configPath)) fs.writeFileSync(configPath, '[]');
+      
       const servers = JSON.parse(fs.readFileSync(configPath, 'utf8'));
       const list = document.getElementById('serverList');
       list.innerHTML = '';
-      
-      if (servers.length === 0) {
-        list.innerHTML = '<div style="color:#666; font-size: 0.8rem; text-align: center; margin-top: 20px;">No saved servers yet.</div>';
-      }
-
       servers.forEach(s => {
         const item = document.createElement('div');
         item.className = 'server-item';
-        item.innerHTML = `<div><strong>${s.name}</strong><br><small style="color:#888">${s.user}@${s.host}</small></div>`;
+        item.innerHTML = `<div><strong>${s.name}</strong><br><small>${s.user}@${s.host}</small></div>`;
         item.onclick = () => {
           document.getElementById('serverName').value = s.name;
           document.getElementById('host').value = s.host;
@@ -131,29 +125,28 @@
     }
 
     document.getElementById('saveBtn').onclick = () => {
-      const name = document.getElementById('serverName').value || 'New Server';
-      const host = document.getElementById('host').value;
-      const user = document.getElementById('user').value;
-      if (!host || !user) return;
-
       const servers = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-      servers.push({ name, host, user });
+      servers.push({
+        name: document.getElementById('serverName').value || 'Server',
+        host: document.getElementById('host').value,
+        user: document.getElementById('user').value
+      });
       fs.writeFileSync(configPath, JSON.stringify(servers, null, 2));
       loadServers();
     };
 
-    // 4. SFTP File Explorer Logic (Browsing & Downloading)
+    // 4. File Explorer & SFTP
     ipcRenderer.on('sftp-list', (event, { path: remotePath, files }) => {
       const container = document.getElementById('filesContainer');
       document.getElementById('currentPath').innerText = remotePath;
       container.innerHTML = '';
 
-      // Back button logic if not at root
       if (remotePath !== '.' && remotePath !== '/') {
         const back = document.createElement('div');
         back.className = 'file-item folder';
-        back.innerHTML = `<span>⬅️ .. (Parent Directory)</span>`;
-        back.onclick = () => ipcRenderer.send('sftp-ls', path.posix.dirname(remotePath));
+        back.innerHTML = `<span>⬅️ .. (Parent)</span>`;
+        // Handle path logic safely
+        back.onclick = () => ipcRenderer.send('sftp-ls', remotePath.split('/').slice(0, -1).join('/') || '/');
         container.appendChild(back);
       }
 
@@ -161,44 +154,36 @@
         const isDir = (file.attrs.mode & 0o040000) !== 0;
         const item = document.createElement('div');
         item.className = `file-item ${isDir ? 'folder' : ''}`;
-        
-        const downloadBtn = !isDir 
-          ? `<button class="dl-btn" onclick="downloadFile(event, '${remotePath}/${file.filename}', '${file.filename}')">DL</button>` 
-          : '';
-
-        item.innerHTML = `<span>${isDir ? '📁' : '📄'} ${file.filename}</span> ${downloadBtn}`;
-        
-        if (isDir) {
-          item.onclick = () => ipcRenderer.send('sftp-ls', `${remotePath}/${file.filename}`);
-        }
+        const dlBtn = !isDir ? `<button class="dl-btn" onclick="downloadFile(event, '${remotePath}/${file.filename}', '${file.filename}')">DL</button>` : '';
+        item.innerHTML = `<span>${isDir ? '📁' : '📄'} ${file.filename}</span> ${dlBtn}`;
+        if (isDir) item.onclick = () => ipcRenderer.send('sftp-ls', `${remotePath}/${file.filename}`);
         container.appendChild(item);
       });
     });
 
     function downloadFile(e, remotePath, filename) {
-      e.stopPropagation(); // Stop folder click from firing
+      e.stopPropagation();
       ipcRenderer.send('sftp-download', { remotePath, filename });
     }
 
-    // 5. Connect & Interactive IO
+    document.getElementById('uploadBtn').onclick = () => {
+      ipcRenderer.send('sftp-upload', { remoteDir: document.getElementById('currentPath').innerText });
+    };
+
+    // 5. Connection
     document.getElementById('connectBtn').onclick = () => {
       const host = document.getElementById('host').value;
       const username = document.getElementById('user').value;
       const password = document.getElementById('pass').value;
-      
-      term.writeln(`\x1b[33m>>> Initiating connection to ${host}...\x1b[0m`);
+      term.writeln(`\x1b[33m>>> Connecting to ${host}...\x1b[0m`);
       ipcRenderer.send('ssh-connect', { host, username, password });
     };
 
     term.onData(data => ipcRenderer.send('ssh-input', data));
     ipcRenderer.on('ssh-data', (event, data) => term.write(data));
-    ipcRenderer.on('ssh-status', (event, status) => { 
-        term.writeln(`\x1b[32m[+] ${status}\x1b[0m\r\n`); 
-        term.focus(); 
-    });
-    ipcRenderer.on('ssh-error', (event, msg) => term.writeln(`\r\n\x1b[31m[!] Error: ${msg}\x1b[0m`));
+    ipcRenderer.on('ssh-status', (event, status) => { term.writeln(`\x1b[32m[+] ${status}\x1b[0m\r\n`); term.focus(); });
+    ipcRenderer.on('ssh-error', (event, msg) => term.writeln(`\x1b[31m[!] Error: ${msg}\x1b[0m`));
 
-    // Load servers on startup
     loadServers();
   </script>
 </body>
