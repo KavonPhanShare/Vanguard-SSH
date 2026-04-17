@@ -1,15 +1,15 @@
 {
   "name": "vanguard-electron",
   "version": "1.0.0",
-  "description": "",
+  "description": "Professional SSH & SFTP Client",
   "main": "main.js",
+  "author": "Kavon A. Campbell",
   "scripts": {
     "start": "electron-forge start",
     "package": "electron-forge package",
     "make": "electron-forge make"
   },
   "keywords": [],
-  "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
@@ -28,5 +28,28 @@
     "@electron-forge/plugin-fuses": "^7.11.1",
     "@electron/fuses": "^1.8.0",
     "electron": "^41.2.1"
+  },
+  "config": {
+    "forge": {
+      "packagerConfig": {
+        "asar": true,
+        "name": "Vanguard",
+        "ignore": [
+          "\\.git",
+          "\\.vscode"
+        ]
+      },
+      "rebuildConfig": {
+        "onlyModules": [] 
+      },
+      "makers": [
+        {
+          "name": "@electron-forge/maker-squirrel",
+          "config": {
+            "name": "vanguard_electron"
+          }
+        }
+      ]
+    }
   }
 }
